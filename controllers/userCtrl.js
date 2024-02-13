@@ -6,38 +6,57 @@ const asyncHandler = fn => (req, res, next) =>
 const User = require("../models/userModel");
 
 // Create a User ----------------------------------------------
+
 const createUser = asyncHandler(async (req, res) => {
+  /**
+   * TODO:Get the email from req.body
+   */
   const email = req.body.email;
+  /**
+   * TODO:With the help of email find the user exists or not
+   */
+  const findUser = await User.findOne({ email: email });
 
-  // Check if the user with the provided email already exists
-  const existingUser = await User.findOne({ email });
-
-  if (existingUser) {
-    // If user already exists, return an error
-    throw new Error("User already exists");
+  if (!findUser) {
+    /**
+     * TODO:if user not found user create a new user
+     */
+    const newUser = await User.create(req.body);
+    res.json(newUser);
+  } else {
+    /**
+     * TODO:if user found then throw an error: User already exists
+     */
+    throw new Error("User Already Exists");
   }
-
-  // If user doesn't exist, create a new user
-  const newUser = await User.create(req.body);
-  res.json(newUser);
 });
 
-// Login a user ----------------------------------------------
+// Login a user
 const loginUserCtrl = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-
-  // Find the user by email
-  const user = await User.findOne({ email });
-
-  // Check if the user exists and the password is correct
-  if (!user || !user.isValidPassword(password)) {
-    // If user doesn't exist or password is incorrect, return an error
-    throw new Error("Invalid email or password");
+  // check if user exists or not
+  const findUser = await User.findOne({ email });
+  if (findUser && (await findUser.isPasswordMatched(password))) {
+    const refreshToken = await generateRefreshToken(findUser?._id);
+    const updateuser = await User.findByIdAndUpdate(
+      findUser.id,
+      {
+        refreshToken: refreshToken,
+      },
+      { new: true }
+    );
+    
+    res.json({
+      _id: findUser?._id,
+      firstname: findUser?.firstname,
+      lastname: findUser?.lastname,
+      email: findUser?.email,
+      mobile: findUser?.mobile,
+      token: generateToken(findUser?._id),
+    });
+  } else {
+    throw new Error("Invalid Credentials");
   }
-
-  // If user exists and password is correct, perform login logic (e.g., generate JWT token)
-  // Replace the following line with your actual login logic
-  res.json({ message: "Login successful", user });
 });
 
 module.exports = { createUser, loginUserCtrl };
